@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # Python FastAPI Service
+  python-service:
+    build:
+      context: .
+      dockerfile: python.dockerfile
+    container_name: fastapi-service
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # Node Fastify Gateway Service
+  node-service:
+    build:
+      context: .
+      dockerfile: node.dockerfile
+    container_name: fastify-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_PORT=8080
+      - PYTHON_HOST=python-service
+      - PYTHON_PORT=3001
+      - NODE_ENV=production
+    networks:
+      - app-network
+    depends_on:
+      - python-service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/app"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+networks:
+  app-network:
+    driver: bridge

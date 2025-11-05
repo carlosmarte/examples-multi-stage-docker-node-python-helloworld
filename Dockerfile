@@ -1,47 +1,55 @@
 ############################################
-# Stage 1: Build Node (Fastify)
+# Docker-in-Docker Orchestrator Container
 ############################################
-FROM node:20-slim AS node-builder
+FROM docker:27-dind
 
-WORKDIR /nodeapp
-COPY node_server.js package*.json ./
-RUN npm install --omit=dev
-
-############################################
-# Stage 2: Build Python (FastAPI)
-############################################
-FROM python:3.11-slim AS python-builder
-
-WORKDIR /pyapp
-COPY python_app/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY python_app .
-
-############################################
-# Stage 3: Final Runtime Image
-############################################
-FROM alpine:3.19 AS runtime
-
-# Install minimal runtime deps
+# Install docker-compose plugin and other utilities
 RUN apk add --no-cache \
-    python3 py3-pip nodejs npm curl
+    docker-cli-compose \
+    bash \
+    curl \
+    git
 
-# Copy Node app from node-builder
-WORKDIR /app
-COPY --from=node-builder /nodeapp ./nodeapp
+# Set working directory
+WORKDIR /orchestrator
 
-# Copy Python app from python-builder
-COPY --from=python-builder /pyapp ./pyapp
+# Copy docker-compose configuration and service dockerfiles
+COPY docker-compose.yml .
+COPY node.dockerfile .
+COPY python.dockerfile .
+COPY node_server.js .
+COPY package.json .
+COPY package-lock.json* .
+COPY python_app ./python_app
 
-# Install Python dependencies
-RUN pip3 install --no-cache-dir --break-system-packages -r /app/pyapp/requirements.txt
+# Create startup script that starts dockerd and runs compose
+RUN cat > /start.sh << 'EOF'
+#!/bin/bash
+set -e
 
-# Install PM2 to manage both services
-RUN npm install -g pm2
+echo "Starting Docker daemon..."
+dockerd-entrypoint.sh &
 
-# Create PM2 ecosystem config
-COPY ecosystem.config.js /app/ecosystem.config.js
+# Wait for Docker daemon to be ready
+echo "Waiting for Docker daemon to be ready..."
+while ! docker info >/dev/null 2>&1; do
+    sleep 1
+done
 
-# Only expose Node.js gateway port (Python runs internally on 3001)
-EXPOSE 3000
-CMD ["pm2-runtime", "/app/ecosystem.config.js"]
+echo "Docker daemon is ready"
+echo "Docker version: $(docker --version)"
+echo "Docker Compose version: $(docker compose version)"
+
+# Build and start services with docker-compose
+cd /orchestrator
+echo "Starting services with docker-compose..."
+docker compose up --build
+
+EOF
+
+RUN chmod +x /start.sh
+
+# Expose port 8080 for the application
+EXPOSE 8080
+
+CMD ["/start.sh"]
