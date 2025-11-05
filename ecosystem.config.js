@@ -7,7 +7,7 @@ module.exports = {
       instances: 1,
       autorestart: true,
       watch: false,
-      max_memory_restart: '1G',
+      max_memory_restart: '1.5G',
       env: {
         NODE_ENV: 'production'
       }
@@ -15,12 +15,15 @@ module.exports = {
     {
       name: 'fastapi-app',
       script: 'python3',
-      args: '-m uvicorn main:app --host 0.0.0.0 --port 3001',
+      args: `-m uvicorn main:app --host 0.0.0.0 --port ${process.env.PORT || 3001}`,
       cwd: '/app/pyapp',
       instances: 1,
       autorestart: true,
       watch: false,
-      max_memory_restart: '1G'
+      max_memory_restart: '1.5G',
+      env: {
+        PORT: process.env.PORT || 3001
+      }
     }
   ]
 };

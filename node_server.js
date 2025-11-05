@@ -3,7 +3,7 @@ const fastify = require('fastify')({ logger: true });
 // Register the http-proxy plugin for proxying to Python service
 // Route /llm/* to Python service, stripping the /llm prefix
 fastify.register(require('@fastify/http-proxy'), {
-  upstream: 'http://127.0.0.1:3001',
+  upstream: `http://127.0.0.1:${process.env.PYTHON_PORT || 3001}`,
   prefix: '/llm',
   rewritePrefix: '/', // Strip /llm prefix when forwarding to Python
   http2: false,
@@ -26,8 +26,9 @@ fastify.get('/app', async (request, reply) => {
 
 const start = async () => {
   try {
-    await fastify.listen({ port: 3000, host: '0.0.0.0' });
-    console.log('Fastify server running on http://0.0.0.0:3000');
+    const port = process.env.NODE_PORT || 3000;
+    await fastify.listen({ port, host: '0.0.0.0' });
+    console.log(`Fastify server running on http://0.0.0.0:${port}`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
