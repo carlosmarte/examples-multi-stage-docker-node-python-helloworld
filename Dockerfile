@@ -20,12 +20,11 @@ COPY python_app .
 ############################################
 # Stage 3: Final Runtime Image
 ############################################
-FROM debian:bookworm-slim AS runtime
+FROM alpine:3.19 AS runtime
 
 # Install minimal runtime deps
-RUN apt-get update && apt-get install -y \
-    python3 python3-pip nodejs npm curl && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache \
+    python3 py3-pip nodejs npm curl
 
 # Copy Node app from node-builder
 WORKDIR /app
